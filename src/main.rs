@@ -40,10 +40,8 @@ fn main() {
     // pool pub key | token-a(SRM) | balance-of-a | token-b(USDT) | balance-of-b |
     let mut table = Table::new();
     table.add_row(row![
-        "Pool",
-        "Token A Pubkey",
-        //"Balance A",
-        "Token B Pubkey",
+        "Pool", "Token A", //"Balance A",
+        "Token B",
         //"Balance B",
         //"Curve"
     ]);
@@ -56,8 +54,20 @@ fn main() {
 
         // parse swap data
         let info = SwapInfo::unpack_from_slice(&pool.1.data).expect("invalid swap info");
-        cells.push(Cell::new(format!("{}", info.token_a).as_str()));
-        cells.push(Cell::new(format!("{}", info.token_b).as_str()));
+
+        //println!("info: {:?}", &info);
+
+        let token_a_pubkey = format!("{}", info.token_a_mint);
+        let token_a_name = token_maps
+            .get(&info.token_a_mint)
+            .unwrap_or(&token_a_pubkey);
+        cells.push(Cell::new(token_a_name));
+
+        let token_b_pubkey = format!("{}", info.token_b_mint);
+        let token_b_name = token_maps
+            .get(&info.token_b_mint)
+            .unwrap_or(&token_b_pubkey);
+        cells.push(Cell::new(token_b_name));
 
         table.add_row(Row::new(cells));
     }
