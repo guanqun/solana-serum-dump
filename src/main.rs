@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate prettytable;
-use prettytable::{Cell, Row, Table};
+use prettytable::Table;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use spl_token_swap::{solana_program::program_pack::Pack, state::SwapInfo};
@@ -31,48 +31,77 @@ fn main() {
         })
         .collect();
 
-    // need to get the decimals so that we can output the right number.
-
-    // output the real name if we can find it, otherwise, dump the raw pubkey
-    // the format is as follows:
-    // ?? can we something like tabular crate?
-    // one line is one pool.
-    // pool pub key | token-a(SRM) | balance-of-a | token-b(USDT) | balance-of-b |
     let mut table = Table::new();
     table.add_row(row![
-        "Pool", "Token A", //"Balance A",
+        "Pool",
+        "Token A",
+        "Balance A",
         "Token B",
-        //"Balance B",
+        "Balance B",
         //"Curve"
     ]);
 
     for pool in &pool_accounts {
-        let mut cells = vec![];
-
         // pool address
-        cells.push(Cell::new(format!("{}", pool.0).as_str()));
+        let pool_address = format!("{}", pool.0);
 
         // parse swap data
         let info = SwapInfo::unpack_from_slice(&pool.1.data).expect("invalid swap info");
 
-        //println!("info: {:?}", &info);
+        println!("info: {:?}", &info);
 
-        let token_a_pubkey = format!("{}", info.token_a_mint);
-        let token_a_name = token_maps
-            .get(&info.token_a_mint)
-            .unwrap_or(&token_a_pubkey);
-        cells.push(Cell::new(token_a_name));
+        let calculate_fn = |token: &Pubkey, mint: &Pubkey| {
+            let accounts = client
+                .get_multiple_accounts(&[*token, *mint])
+                .expect("failed to get accounts");
 
-        let token_b_pubkey = format!("{}", info.token_b_mint);
-        let token_b_name = token_maps
-            .get(&info.token_b_mint)
-            .unwrap_or(&token_b_pubkey);
-        cells.push(Cell::new(token_b_name));
+            let token_data = accounts[0]
+                .as_ref()
+                .expect("failed to get token")
+                .data
+                .clone();
+            let token_state = spl_token::state::Account::unpack(&token_data)
+                .expect("failed to unpack token data");
 
-        table.add_row(Row::new(cells));
+            let mint_data = accounts[1]
+                .as_ref()
+                .expect("failed to get mint")
+                .data
+                .clone();
+            let mint_state =
+                spl_token::state::Mint::unpack(&mint_data).expect("failed to unpack mint data");
+
+            let name = token_maps
+                .get(mint)
+                .map(|n| n.clone())
+                .unwrap_or_else(|| format!("{}", token));
+
+            let mut divisor: u64 = 1;
+            for _ in 0..mint_state.decimals {
+                divisor *= 10;
+            }
+            let balance = fraction::division::divide_to_string(
+                token_state.amount,
+                divisor,
+                mint_state.decimals as usize,
+                false,
+            )
+            .expect("failed to divide");
+
+            (name, balance)
+        };
+
+        let (token_a_name, token_a_balance) = calculate_fn(&info.token_a, &info.token_a_mint);
+        let (token_b_name, token_b_balance) = calculate_fn(&info.token_b, &info.token_b_mint);
+
+        table.add_row(row![
+            &pool_address,
+            &token_a_name,
+            &token_a_balance,
+            &token_b_name,
+            &token_b_balance
+        ]);
     }
 
     table.printstd();
-
-    // then we can enter an interactive mode where we can send out the swap instruction, that'll be quite cool.
 }
