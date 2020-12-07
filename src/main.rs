@@ -38,7 +38,7 @@ fn main() {
         "Balance A",
         "Token B",
         "Balance B",
-        //"Curve"
+        "1 A ~ ? B"
     ]);
 
     for pool in &pool_accounts {
@@ -47,8 +47,6 @@ fn main() {
 
         // parse swap data
         let info = SwapInfo::unpack_from_slice(&pool.1.data).expect("invalid swap info");
-
-        println!("info: {:?}", &info);
 
         let calculate_fn = |token: &Pubkey, mint: &Pubkey| {
             let accounts = client
@@ -94,12 +92,16 @@ fn main() {
         let (token_a_name, token_a_balance) = calculate_fn(&info.token_a, &info.token_a_mint);
         let (token_b_name, token_b_balance) = calculate_fn(&info.token_b, &info.token_b_mint);
 
+        let ratio: f64 = f64::from_str(&token_b_balance).expect("invalid float")
+            / f64::from_str(&token_a_balance).expect("invalid float");
+
         table.add_row(row![
             &pool_address,
             &token_a_name,
             &token_a_balance,
             &token_b_name,
-            &token_b_balance
+            &token_b_balance,
+            &format!("{:?}", ratio)
         ]);
     }
 
