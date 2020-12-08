@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate prettytable;
+use indicatif::ProgressBar;
 use prettytable::Table;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -40,6 +41,8 @@ fn main() {
         "Balance B",
         "1 A ~ ? B"
     ]);
+
+    let bar = ProgressBar::new(pool_accounts.len() as u64);
 
     for pool in &pool_accounts {
         // pool address
@@ -103,6 +106,8 @@ fn main() {
             &token_b_balance,
             &format!("{:?}", ratio)
         ]);
+
+        bar.inc(1);
     }
 
     table.printstd();
